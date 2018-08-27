@@ -168,6 +168,24 @@ def create_5D_PDF_file(OutputFileName,hist,binedges,distinct_regions_binedges,la
     return
 
 def calc_LLHR(in_array, sig_hist, bkg_hist, binedges, distinct_regions_binedges, SubtractEventFromPDF):
+    """
+    Step 1. In this code, the in_array will be histogrammed using binedges that were also 
+    used for sig_hist, bkg_hist . 
+    
+    Step 2. Appropriate slice of the sig_hist, bkg_hist will be taken
+    based on Energy and zenith of this event. Stored in first two
+    elements of in_array. First two dimensions of the PDF are reserved
+    for energy and zenith.
+
+    Step 3. LLH Ratio will be calculated after splitting histogrammed event,
+    sig_hist, bkg_hist into the distinct_regions . Then llh ratios from each
+    distinct region will be summed up to generate a total llh ratio.
+    
+    SubtractEventFromMap==Sig/Bkg means whether this event was used for construction
+    of the Sig/Bkg PDFs. If so, it needs to be removed from the corresponding PDF 
+    before using the PDF for calculating the llh ratio. Otherwise it would lead
+    to overfitting/bias (since the probability of this event is affected by itself).
+    """
 
     d={}
     d['llh_ratio']= 0.
