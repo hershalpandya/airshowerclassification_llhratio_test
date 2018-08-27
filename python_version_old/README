@@ -1,0 +1,40 @@
+------llh_ratio_nd.py
+
+Contains the main function to calculate log-likelihood ratio.
+
+------llhr_main.py and llhr_class.py
+
+class functions are called in the main file in a sequence to do operations.
+just like i3tray.
+
+pls note that llhr_main.py will not work out of the box. i deleted all extra statements from a working script to have a skeleton to show how to use llhr_class.py .
+
+it is designed to perform like an i3tray on hdf5 files.
+
+#MOST BASIC USE would go like this:
+
+from llh_ratio_nd import *
+
+llh_ratio = toz_sig = toz_bkg =0
+
+for sub_hist_range in [hits_hist_range, unhits_hist_range, excluded_hist_range]:
+    slice_vector = get_slice_vector(pdf_edges, sub_hist_range)
+
+    sig_norm=np.sum(sig_pdf[slice_vector])
+    bkg_norm=np.sum(bkg_pdf[slice_vector])
+
+    temp = log_likelihood_ratio(heatmap1=sig_pdf[slice_vector],
+                                 heatmap2=bkg_pdf[slice_vector],
+                                 event_hist = event_hist[slice_vector])
+
+    llh_ratio += temp[0]
+    toz_sig += temp[1]
+    toz_bkg += temp[2]
+    # returns normalized heatmaps for each sub_hist_range
+    # adding all into final_heatmap makes norm = 3.0
+    # won't affect llh_ratio because it's a ratio
+    # be careful if you start looking at llh
+    final_heatmap_sig[slice_vector] = temp[3]*sig_norm/np.sum(temp[3]) 
+    final_heatmap_bkg[slice_vector] = temp[4]*bkg_norm/np.sum(temp[4])
+    llh_sig += temp[5]
+    llh_bkg += temp[6]
