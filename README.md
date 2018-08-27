@@ -1,11 +1,11 @@
 # IceTop Log-Likelihood Ratio Test
 
-## RepoName: airshowerclassification_llhratio_test
+*RepoName*: airshowerclassification_llhratio_test
 
-## Author: Hershal Pandya
+*Author*: Hershal Pandya
 
-## Email: hershal@udel.edu
+*Email*: hershal@udel.edu
 
-## Description:
+*Description*:
 
 
