@@ -12,4 +12,3 @@ The code was initially developed for the purpose of classifying air showers gene
 
 I am generalizing the code presently so that it may be used by anyone to carry out a multi-dimensional PDF based log-likelihood ratio test.
 
-$\frac{a}{b}$
