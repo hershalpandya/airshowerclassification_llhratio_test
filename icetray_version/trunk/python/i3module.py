@@ -26,9 +26,9 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
 
     For event 'i', llhr = Log(LLH that i belongs to A/ LLH that i belongs to B)
 
-    This class does operates under two modes:
+    This class can operate under two modes:
     1. RunMode == GeneratePDF
-    This is when you input all i3files corresponding to 
+    This is when you input events corresponding to 
     same event class: e.g. all class A events.
     It will generate an output file , say classA_PDF.h5. 
 
@@ -46,6 +46,17 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
     Then for calculating log-likelihood ratio, provide these two files
     as input. And run this module over data events in CalcLLHR mode. 
 
+    The module is currently setup for IceTop analyses where you have :
+    *charge, time, distance for each tank
+    *hit/unhit/excluded type of tanks for each event
+    *energy, zenith for each event
+
+    The llh ratio is calculated in energy/zenith bins that user
+    can define in binedges. The first two dimensions are reserved
+    for energy, and zenith respectively.
+
+    For that E+zen bin, llh ratio is calculated using Q,T,R
+    3D PDFs for SIG and BKG.
     """
 
     def __init__(self,ctx):
