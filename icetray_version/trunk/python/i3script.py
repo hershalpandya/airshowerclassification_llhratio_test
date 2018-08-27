@@ -24,9 +24,10 @@ from icecube.tableio import I3TableWriter
 from icecube.hdfwriter import I3HDFTableService
 
 from i3module import IceTop_LLHRatio
-from globals import (rotate_to_shower_cs, logEnergyBins, cosZenBins,
+from globals import (logEnergyBins, cosZenBins,
                      logChargeBins, logDBins, logTBins, pulses1, pulses2,
                      pulses3, reco_track2, reco_track1)
+from general_functions import rotate_to_shower_cs
 from icetop_l3_dataprep import Generate_Input_IceTop_LLHRatio
 
 def print_length(frame, key):
@@ -91,8 +92,10 @@ if __name__ == '__main__':
     # Uncompress Level3 diff files
     tray.Add(uncompress, 'uncompress')
 
-    icetop_excluded_tanks_lists=['TankPulseMergerExcludedSLCTanks',
-                             'IceTopHLCSeedRTExcludedTanks']
+    #icetop_excluded_tanks_lists=['TankPulseMergerExcludedSLCTanks',
+    #                         'IceTopHLCSeedRTExcludedTanks']
+
+    icetop_excluded_tanks_lists=['IceTopHLCSeedRTExcludedTanks']
 
     tray.Add(merge_excluded_tanks_lists,'mergethem',
              MergedListName='IceTopExcludedTanksAll',
@@ -114,14 +117,14 @@ if __name__ == '__main__':
           
     #tray.Add(print_length2,key='IceTopHLCSeedRTExcludedTanks')
     #tray.Add(print_length2,key='TankPulseMergerExcludedSLCTanks')
-    tray.Add(print_length2,key='IceTopExcludedTanksAll')
-    tray.Add(print_key,key='IceTopExcludedTanksAll')
+    #tray.Add(print_length2,key='IceTopExcludedTanksAll')
+    #tray.Add(print_key,key='IceTopExcludedTanksAll')
     tray.Add(print_key,key='I3EventHeader')
     #tray.Add(print_length,key='IceTopHLCSeedRTPulses')
     #tray.Add(print_length,key='IceTopLaputopSeededSelectedSLC')
-    tray.Add(print_length2,key='ITLLHR_Hits')
-    tray.Add(print_length2,key='ITLLHR_Unhits')
-    tray.Add(print_length2,key='ITLLHR_Excluded')
+    #tray.Add(print_length2,key='ITLLHR_Hits')
+    #tray.Add(print_length2,key='ITLLHR_Unhits')
+    #tray.Add(print_length2,key='ITLLHR_Excluded')
 
     if args.RunMode == 'GeneratePDF':
         tray.Add(IceTop_LLHRatio,'make_hist',

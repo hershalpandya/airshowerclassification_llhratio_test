@@ -16,43 +16,7 @@ import numpy as np
 import tables
 from icecube.icetray.i3logging import log_fatal,log_warn
 from llh_ratio_nd import get_slice_vector,log_likelihood_ratio
-
-def signed_log(t):
-     return np.sign(t)*np.log10(np.absolute(t)+1)
-
-def log_plus_one(t):
-    return np.log10(t+1)
-
-def check_distinct_regions_add_up_to_full(distinct_regions_binedges,binedges,decimals=2):
-    combine_edges=[]
-    for i in range(len(distinct_regions_binedges)):
-        for j in range(len(distinct_regions_binedges[i])):
-            if i==0:
-                combine_edges.append(distinct_regions_binedges[i][j])
-            else:
-                combine_edges[j]=np.unique(np.sort(np.concatenate((combine_edges[j],distinct_regions_binedges[i][j]))))
-
-    for i in range(len(binedges)):
-        are_equal=(np.round(binedges[i],decimals=decimals)==np.round(combine_edges[i],decimals=decimals)).all()
-        if not are_equal:
-            print 'DistinctRegionsBinEdges do not add up to binedges for this dimension'
-            print combine_edges[i], binedges[i]
-            raise Exception('Inconsistency found')
-
-    for i in range(len(distinct_regions_binedges)):
-        for j in range(len(distinct_regions_binedges[0])):
-            if i<len(distinct_regions_binedges)-1:
-                next_one=i+1
-            else:
-                next_one=0
-            intersection=np.intersect1d(np.round(distinct_regions_binedges[i][j],decimals=decimals),np.round(distinct_regions_binedges[next_one][j],decimals=decimals))
-            if len(intersection)>1 and len(intersection)!=len(binedges[j]):
-                print 'comparing "Distinct" regions %i and %i, dimension %i'%(i,next_one,j)
-                print 'These regions Intersect'
-                print 'binedges of region1',distinct_regions_binedges[i]
-                print 'binedges of region2',distinct_regions_binedges[next_one]
-                raise Exception('Inconsistency found')
-    return
+from general_functions import signed_log, log_plus_one, check_distinct_regions_add_up_to_full
 
 class IceTop_LLHRatio(icetray.I3ConditionalModule):
     """
@@ -161,70 +125,26 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
 
     def Finish(self):
         if self.RunMode=='GeneratePDF':
-            # generate the outputfile. save histogram.
-            f=tables.open_file(self.OutputName,'w')
-            f.create_carray('/', 'hist', obj=self.hist,filters=tables.Filters(complib='blosc:lz4hc', complevel=1))
-
-            for i in range(len(self.binedges)):
-                f.create_carray('/', 'binedges_%i'%i,
-                                obj=self.binedges[i],
-                                filters=tables.Filters(complib='blosc:lz4hc',
-                                complevel=1))
-
-            for i in range(len(self.distinct_regions_binedges)):
-                for j in range(len(self.distinct_regions_binedges[0])):
-                    f.create_carray('/', 'region_%i_binedges_%i'%(i,j),
-                                    obj=self.distinct_regions_binedges[i][j],
-                                    filters=tables.Filters(complib='blosc:lz4hc',
-                                    complevel=1))
-
-            f.create_carray('/', 'labels', obj=self.labels,filters=tables.Filters(complib='blosc:lz4hc', complevel=1))
-            f.create_carray('/', 'n_events', obj=[self.n_events],filters=tables.Filters(complib='blosc:lz4hc', complevel=1))
-            f.close()
-
+            from general_functions import create_5D_PDF_file 
+            create_5D_PDF_file(self.OutputName,
+                               self.hist,self.binedges,
+                               self.distinct_regions_binedges,
+                               self.labels, self.n_events)
         return
 
     def _load_PDF_from_file(self):
         '''
         this part is hard wired for 5 dimensional PDFs
         '''
-
-        f=tables.open_file(self.SigPDFInputName,'r')
-        self.sig_hist = f.root.hist[:]
-        self.binedges = [ f.root.binedges_0[:], f.root.binedges_1[:], f.root.binedges_2[:],  f.root.binedges_3[:] , f.root.binedges_4[:]]
-        self.distinct_regions_binedges = [ ]
-        for r in range(1):
-            region_binedges=[]
-            for i in range(3):
-                temp=eval('f.root.region_%i_binedges_%i[:]'%(r,i))
-                region_binedges.append(temp)
-            self.distinct_regions_binedges.append(region_binedges)
-        self.labels = f.root.labels[:]
-        f.close()
-
-        f=tables.open_file(self.BkgPDFInputName,'r')
-        self.bkg_hist = f.root.hist[:]
-        binedges = [ f.root.binedges_0[:], f.root.binedges_1[:], f.root.binedges_2[:],  f.root.binedges_3[:] , f.root.binedges_4[:]]
-        labels = f.root.labels[:]
-        f.close()
-
-        if np.shape(self.sig_hist)!=np.shape(self.bkg_hist):
-            print 'sig hist, bkg hist shapes dont match'
-            print 'sig hist shape',np.shape(sig_hist)
-            print 'bkg hist shape',np.shape(bkg_hist)
-            raise Exception('Inconsistency found')
-
-        for i in range(len(binedges)):
-            are_equal=(np.round(binedges[i],decimals=self.Decimals)==np.round(self.binedges[i],decimals=self.Decimals)).all()
-            if not are_equal:
-                print 'sig binedges dim %i'%i, self.binedges[i]
-                print 'bkg binedges dim %i'%i, binedges[i]
-                raise Exception('Sig and Bkg binedges are not equal')
-
-        if (labels!=self.labels).any():
-            print 'labels for sig and bkg are not same'
-            print 'are you sure you are loading correct sig/bkg pdfs?'
-
+        from general_functions import load_5D_PDF_from_file
+        temp = load_5D_PDF_from_file(self.SigPDFInputName, self.BkgPDFInputName)
+        self.sig_hist=temp[0]
+        self.bkg_hist=temp[1]
+        self.binedges=temp[2]
+        self.distinct_regions_binedges=temp[3]
+        self.labels=temp[4]
+        #sig_n_events=temp[5]
+        #bkg_n_events = temp[6]
         return
 
     def _init_hist(self):
@@ -249,88 +169,13 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         return
 
     def _CalcLLHRPhysics(self,frame):
+        
+        from general_functions import calc_LLHR
 
-        d={}
-        d['llh_ratio']= 0.
-        d['n_extrapolations_sig_PDF'] = 0.
-        d['n_extrapolations_bkg_PDF'] = 0.
-        d['llh_sig'] = 0.
-        d['llh_bkg'] = 0.
-        d['isGood'] = 0.
-
-        # load event information
-        in_array = self._create_in_array(frame)
-        logE=in_array[0][0]
-        coszen=in_array[0][1]
-
-        # select Q, T, R dimensions, generate event histogram
-        in_array = (in_array.T[2:]).T
-        binedges = self.binedges[2:]
-        event_hist,temp = np.histogramdd(in_array, binedges)
-
-        # check if event logE and coszen lies within range of binedges
-        if logE>self.binedges[0][-1] or logE<self.binedges[0][0]:
-            frame.Put(self.objname,dataclasses.I3MapStringDouble(d))
-            return
-        if coszen>self.binedges[1][-1] or coszen<self.binedges[1][0]:
-            frame.Put(self.objname,dataclasses.I3MapStringDouble(d))
-            return
-
-        # find the logE and coszen bins select those bins in sig/bkg pdfs
-        logEbincenters = np.array((self.binedges[0][1:] + self.binedges[0][:-1] )/2.)
-        coszenbincenters = np.array((self.binedges[1][1:] + self.binedges[1][:-1] )/2.)
-
-        dE = np.absolute(logEbincenters - logE)
-        Ebin=np.where(np.amin(dE)==dE)[0][0]
-
-        dcZ = np.absolute(coszenbincenters - coszen)
-        cZbin = np.where(np.amin(dcZ)==dcZ)[0][0]
-
-        sig_hist = self.sig_hist[Ebin][cZbin]
-        bkg_hist = self.bkg_hist[Ebin][cZbin]
-        # subtract the event from the PDF if it was used for generating the PDF
-        if self.SubtractEventFromPDF:
-            if self.SubtractEventFromPDF=='Sig':
-                sig_hist = sig_hist - event_hist
-                if (sig_hist<0).any():
-                    log_fatal('Event subtraction led to negative values')
-
-            if self.SubtractEventFromPDF=='Bkg':
-                bkg_hist = bkg_hist - event_hist
-                if (bkg_hist<0).any():
-                    log_fatal('Event subtraction led to negative values')
-
-        # normalize histogram, obtain PDFs
-        sig_pdf = sig_hist/ np.sum(sig_hist)
-        bkg_pdf = bkg_hist/ np.sum(bkg_hist)
-
-        # calculate llh ratio for each region separately and add it up
-        # separate calculation is done to avoid one region influencing
-        # extrapolated values of empty pixels in the PDF in another region
-
-        llh_map_sig=np.zeros_like(sig_hist)
-        llh_map_bkg=np.zeros_like(bkg_hist)
-        d['isGood']=1.
-        for region_edges in self.distinct_regions_binedges:
-            # obtain slice vector for the region of the PDF
-            region_range = [ [i[0],i[-1]] for i in region_edges]
-            slice_vector= get_slice_vector(binedges,region_range)
-            temp = log_likelihood_ratio(heatmap1=sig_pdf[slice_vector],
-                                        heatmap2=bkg_pdf[slice_vector],
-                                        event_hist = event_hist[slice_vector])
-
-            d['llh_ratio'] += temp[0]
-            # all the rest are debugging variables. some will be stored in I3VectorMap.
-            # not storing any histograms as output. Just numbers.
-            d['n_extrapolations_sig_PDF'] += temp[1]
-            d['n_extrapolations_bkg_PDF'] += temp[2]
-            d['llh_sig'] += temp[5]
-            d['llh_bkg'] += temp[6]
-
-            extrapolated_sig_PDF = temp[3]
-            extrapolated_bkg_PDF = temp[4]
-            llh_map_sig[slice_vector]=temp[7]
-            llh_map_bkg[slice_vector]=temp[8]
+        d= calc_LLHR(self.in_array, self.sig_hist, 
+                     self.bkg_hist, self.binedges, 
+                     self.distinct_regions_binedges, 
+                     self.SubtractEventFromPDF)
 
         frame.Put(self.objname,dataclasses.I3MapStringDouble(d))
         return

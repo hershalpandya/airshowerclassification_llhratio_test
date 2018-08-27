@@ -13,7 +13,7 @@ from icecube import phys_services, dataclasses, icetray, recclasses
 import numpy as np
 from icecube.icetray.i3logging import log_fatal,log_warn
 from icecube.dataclasses import I3Constants
-from globals import to_shower_cs
+from general_functions import to_shower_cs
 
 class Generate_Input_IceTop_LLHRatio(icetray.I3ConditionalModule):
     """
