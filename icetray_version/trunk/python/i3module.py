@@ -20,13 +20,39 @@ from general_functions import signed_log, log_plus_one, check_distinct_regions_a
 
 class IceTop_LLHRatio(icetray.I3ConditionalModule):
     """
-    Input takes I3VectorShieldHitRecords with following members:
-    distance
-    residual_time
-    charge
+    A log-likelihood ratio can be understood as the likeliness
+    of this given event to belong to event class A versus 
+    it belonging to event class B.
+
+    For event 'i', llhr = Log(LLH that i belongs to A/ LLH that i belongs to B)
+
+    This class does operates under two modes:
+    1. RunMode == GeneratePDF
+    This is when you input all i3files corresponding to 
+    same event class: e.g. all class A events.
+    It will generate an output file , say classA_PDF.h5. 
+
+    If you need to run over all class A events in batches, you can do so.
+    And output files classA_PDF_1.h5, classA_PDF_2.h5,... can be merged
+    using the merge_PDF utility script provided with this project.
+
+    2. RunMode==CalcLLHR
+    To calculate llh ratio for any events. e.g. data events
+
+    User needs to run this class in GeneratePDF RunMode twice for two 
+    sets of events. This will lead to two output files being created.
+    For e.g. classA_PDF.h5 file, classB_PDF.h5 file.
+
+    Then for calculating log-likelihood ratio, provide these two files
+    as input. And run this module over data events in CalcLLHR mode. 
+
     """
 
     def __init__(self,ctx):
+        """
+        Initialize
+        Accept Input Parameters
+        """
         icetray.I3ConditionalModule.__init__(self, ctx)
 
         #common inputs
@@ -34,7 +60,7 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
                           'Shield applied to Pulses Using a reco',
                           None)
         self.AddParameter('Unhits_I3VectorShieldHitRecord',
-                          'Unhits from Shield and Charge/Time assigned false values',
+                          'Unhits with distance, and Charge/Time assigned false values',
                           None)
         self.AddParameter('Excluded_I3VectorShieldHitRecord',
                           'Containing Dist of Excluded Tanks and Charge/time assigned false values',
@@ -66,10 +92,16 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         self.AddParameter('DecimalsForSanityCheck',
                           'Consistency checks will compare values rounded to these N decimals.Default:2',2)
         self.AddParameter('SubtractEventFromPDF',
-                          'subtract the event from the PDF if it was used for generating the PDF. Default:None',None)
+                          'subtract the event from the PDF if it was used for generating the PDF.Otherwise you are overfitting.
+                          So if you use {A} events to make SigPDF, while calculating llhratio for {A} events, you must 
+                          set this option to "Sig". Options: Sig, Bkg. Default:None',None)
         return
 
     def Configure(self):
+        """
+        Configure
+        Load Input Parameters as class members for easy access
+        """
         self.HitsName = self.GetParameter('Hits_I3VectorShieldHitRecord')
         self.UnhitsName = self.GetParameter('Unhits_I3VectorShieldHitRecord')
         self.ExcludedName = self.GetParameter('Excluded_I3VectorShieldHitRecord')
@@ -114,6 +146,9 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         return
 
     def Physics(self,frame):
+        """
+        Either Generate PDFs or Calc LLHR. 
+        """
         if self.RunMode=='GeneratePDF':
             self._GenPDFsPhysics(frame)
         elif self.RunMode=='CalcLLHR':
@@ -148,12 +183,22 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         return
 
     def _init_hist(self):
+        """
+        initialize a multi-dimensional histogram
+        that will be filled later on by the fill method.
+        This initialization occurs during the calling of Configure method.
+        Which is done only once at the very beginning. 
+        """
         histogram_shape= np.array([len(i)-1 for i in self.binedges])
         self.hist=np.zeros(histogram_shape)
         self.n_events=0
         return
 
     def _fill(self,sample):
+        """
+        Pretty much all that is done during GeneratePDF mode.
+        i.e. to fill up the histogram initialized during Configure.
+        """
         h,edges=np.histogramdd(sample,self.binedges)
 
         if np.shape(h)!=np.shape(self.hist):
@@ -169,7 +214,14 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         return
 
     def _CalcLLHRPhysics(self,frame):
-        
+        """
+        calls the llhratio function
+        what it does is:
+        find the 3D slice of 5D PDF based on the 
+        energy/zenith of the event.
+        Calculate a 3D llh ratio using the q,t,r 
+        values for this event.
+        """
         from general_functions import calc_LLHR
 
         d= calc_LLHR(self.in_array, self.sig_hist, 
@@ -181,7 +233,12 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         return
 
     def _create_in_array(self,frame):
-
+        """
+        Create the IceTop specific input array that goes into
+        GeneratePDF / CalcLLHR .
+        This is method will need to be 
+        adapted for each analysis.
+        """
         if self.EnergyRecoName:
             En = np.log10(frame[self.EnergyRecoName].energy)
         elif self.LaputopParamsName:
