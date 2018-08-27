@@ -126,6 +126,10 @@ def log_likelihood_ratio(heatmap1,heatmap2,event_hist):
     return llh1-llh2,toz_1,toz_2,heatmap1, heatmap2, llh1, llh2, logprod1, logprod2
 
 def get_slice_vector(edges, sub_range):
+    """
+    returns a slice vector that selects the given range
+    from the histogram that has given edges
+    """
     slice_vector=[]
     for dim in range(len(edges)):
         tedges = edges[dim]
