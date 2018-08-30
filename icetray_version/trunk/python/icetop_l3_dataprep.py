@@ -29,7 +29,7 @@ class Generate_Input_IceTop_LLHRatio(icetray.I3ConditionalModule):
                           'Input SLCTankPulses','LaputopSeededSelectedSLC')
         self.AddParameter('ExcludedTanksListName',
                           'Input ExcludedTanksList','IceTopExcludedTanks')
-        self.AddParameter('RecoName',
+        self.AddParameter('AngularReco_I3Particle',
                           'I3Particle with Shower core + direction',
                           'Laputop')
         self.AddParameter('ExcludedFalseCharge',
@@ -72,7 +72,7 @@ class Generate_Input_IceTop_LLHRatio(icetray.I3ConditionalModule):
         self.hlc_name = self.GetParameter('HLCTankPulsesName')
         self.slc_name = self.GetParameter('SLCTankPulsesName')
         self.excluded_name = self.GetParameter('ExcludedTanksListName')
-        self.reco_name = self.GetParameter('RecoName')
+        self.reco_name = self.GetParameter('AngularReco_I3Particle')
         self.exc_fake_q = self.GetParameter('ExcludedFalseCharge')
         self.exc_fake_t = self.GetParameter('ExcludedFalseTime')
         self.unhit_fake_q = self.GetParameter('UnhitFalseCharge')

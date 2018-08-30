@@ -25,44 +25,8 @@ from icecube.tableio import I3TableWriter
 from icecube.hdfwriter import I3HDFTableService
 
 from i3module import IceTop_LLHRatio
-from globals import (logS125Bins, cosZenlaputopBins,
-                     logChargeBins, logDBins, logTBins, pulses1, pulses2,
-                     pulses3, reco_track2, reco_track1)
-from general_functions import rotate_to_shower_cs
+import globals_composition as globals                     
 from icetop_l3_dataprep import Generate_Input_IceTop_LLHRatio
-
-def print_length(frame, key):
-    if key in frame:
-        getpulse=dataclasses.I3RecoPulseSeriesMap.from_frame(frame,key)
-        print('len({}) = {}'.format(key, len(getpulse)))
-    return
-
-def print_length2(frame, key):
-    if key in frame:
-        print('len({}) = {}'.format(key, len(frame[key])))
-
-def merge_excluded_tanks_lists(frame, 
-                                MergedListName=None,
-                                ListofExcludedTanksLists=[]):
-
-    exclude = dataclasses.TankKey.I3VectorTankKey()
-    for tag in ListofExcludedTanksLists:
-        if tag in frame:
-            tanks = frame[tag]
-            for key in tanks:
-                if key not in exclude:
-                    exclude.append(key)
-
-    if MergedListName in frame:
-         frame.Delete(MergedListName)
-
-    frame.Put(MergedListName, exclude)
-    return
-
-def print_key(frame, key):
-    if key in frame:
-        print('{} = {}'.format(key, frame[key]))
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -74,15 +38,28 @@ if __name__ == '__main__':
                         dest='pdf_file',
                         default='hist.hd5',
                         help='output PDF HDF5 only created in case of GeneratePDF mode')
+    parser.add_argument('--Sig_PDF',
+                        dest='sig_pdf',
+                        default=None,
+                        help='Sig PDF made in GenereatePDF mode')
+    parser.add_argument('--Bkg_PDF',
+                        dest='bkg_pdf',
+                        default=None,
+                        help='Bkgg PDF made in GenereatePDF mode')                        
     parser.add_argument('--RunMode',
                         dest='RunMode',
                         default='GeneratePDF',
                         choices=['GeneratePDF', 'CalcLLHR'],
                         help='GeneratePDF/CalcLLHR')
+    parser.add_argument('--SubtractEventFromPDF',
+                        dest='SubtractEventFromPDF',
+                        default=None,
+                        choices=['Sig', 'Bkg', None],
+                        help='If event was used in Sig PDF then use Sig.')                        
     parser.add_argument('--inputs',
                         dest='inputs',
                         nargs='*',
-                        help='Input files to run over')
+                        help='Input files')
     args = parser.parse_args()
 
     icetray.logging.console()
@@ -90,79 +67,96 @@ if __name__ == '__main__':
 
     tray = I3Tray()
     tray.Add('I3Reader', filenamelist=args.inputs)
+    
     # Uncompress Level3 diff files
     tray.Add(uncompress, 'uncompress')
+    
+    def cut_s125(frame,objname,low,high):
+        s=frame[objname].value(recclasses.LaputopParameter.Log10_S125)
+        return low<=s<high
+    tray.Add(cut_s125,'cut s125',
+             objname = globals.energy_reco,   
+             low=globals.binedges[0][0],
+             high=globals.binedges[0][-1])                
 
-    #icetop_excluded_tanks_lists=['TankPulseMergerExcludedSLCTanks',
-    #                         'IceTopHLCSeedRTExcludedTanks']
-
-    icetop_excluded_tanks_lists=['IceTopHLCSeedRTExcludedTanks']
-
+    def cut_coszen(frame,objname,low,high):
+        z=np.cos(frame[objname].dir.zenith)
+        if np.absolute(high-1.0)<1e-3:
+            high+= 0.01 # otherwise all costheta 1 will be removed
+        return low<=z<high
+    tray.Add(cut_coszen,'cut coszen',
+             objname = globals.angle_reco, 
+             low=globals.binedges[1][0],
+             high=globals.binedges[1][-1])
+             
     def make_qc(frame):
         o=frame['IT73AnalysisIceTopQualityCuts']
         return np.array(o.values()).all()
-        
-    tray.Add(make_qc,'make qc')                   
+    tray.Add(make_qc,'make qc')        
+
+    # merge multiple excluded tanks lists into one
+    #todo: add a module that converts BadDomsList from GCD to excluded tanks list
+    icetop_excluded_tanks_lists=['IceTopHLCSeedRTExcludedTanks']         
+    from general_functions import merge_excluded_tanks_lists
     tray.Add(merge_excluded_tanks_lists,'mergethem',
              MergedListName='IceTopExcludedTanksAll',
-             ListofExcludedTanksLists=icetop_excluded_tanks_lists)
-    #tray.Add(print_key,key='I3EventHeader')
+             ListofExcludedTanksLists=globals.ex_tanks_list)
+
     tray.Add(Generate_Input_IceTop_LLHRatio,'create inputs for next module',
-             HLCTankPulsesName='IceTopHLCSeedRTPulses',
-             SLCTankPulsesName='IceTopLaputopSeededSelectedSLC',
-             ExcludedTanksListName='IceTopExcludedTanksAll',
-             RecoName='Laputop',
-             ExcludedFalseCharge=1e-3,
-             ExcludedFalseTime=1e-4,
-             UnhitFalseCharge=1e-3,
-             UnhitFalseTime=1e-4,
+             HLCTankPulsesName=globals.hlc_tank_pulses,
+             SLCTankPulsesName=globals.slc_tank_pulses,
+             ExcludedTanksListName=globals.ex_tanks_list,
+             AngularReco_I3Particle=globals.angle_reco,
+             ExcludedFalseCharge=globals.ex_q,
+             ExcludedFalseTime=globals.ex_t,
+             UnhitFalseCharge=globals.uh_q,
+             UnhitFalseTime=globals.uh_t,
              SubtractCurvatureBool=False,
-             Hits_I3VectorShieldHitRecord='ITLLHR_Hits',
-             Unhits_I3VectorShieldHitRecord='ITLLHR_Unhits',
-             Excluded_I3VectorShieldHitRecord='ITLLHR_Excluded')
-          
-    #tray.Add(print_length2,key='IceTopHLCSeedRTExcludedTanks')
-    #tray.Add(print_length2,key='TankPulseMergerExcludedSLCTanks')
-    #tray.Add(print_length2,key='IceTopExcludedTanksAll')
-    #tray.Add(print_key,key='IceTopExcludedTanksAll')
-    #tray.Add(print_key,key='I3EventHeader')
-    #tray.Add(print_length,key='IceTopHLCSeedRTPulses')
-    #tray.Add(print_length,key='IceTopLaputopSeededSelectedSLC')
-    #tray.Add(print_length2,key='ITLLHR_Hits')
-    #tray.Add(print_length2,key='ITLLHR_Unhits')
-    #tray.Add(print_length2,key='ITLLHR_Excluded')
+             Hits_I3VectorShieldHitRecord=globals.hits_shield_vector,
+             Unhits_I3VectorShieldHitRecord=globals.unhits_shield_vector,
+             Excluded_I3VectorShieldHitRecord=globals.ex_shield_vector)
 
     if args.RunMode == 'GeneratePDF':
         tray.Add(IceTop_LLHRatio,'make_hist',
-                 Hits_I3VectorShieldHitRecord='ITLLHR_Hits',
-                 Unhits_I3VectorShieldHitRecord='ITLLHR_Unhits',
-                 Excluded_I3VectorShieldHitRecord='ITLLHR_Excluded',
-                 AngularReco_I3Particle='Laputop',
-                 # EnergyReco_I3Particle=reco_track1,
-                 LaputopParamsName='LaputopParams',
-                 OutputFileName='hist2.hdf',
-                 BinEdges5D=[logS125Bins,cosZenlaputopBins,logChargeBins,logTBins,logDBins],
-                 DistinctRegionsBinEdges3D = [[logChargeBins,logTBins,logDBins]],
-                 RunMode='GeneratePDF')
+                 Hits_I3VectorShieldHitRecord=globals.hits_shield_vector,
+                 Unhits_I3VectorShieldHitRecord=globals.unhits_shield_vector,
+                 Excluded_I3VectorShieldHitRecord=globals.ex_shield_vector,
+                 AngularReco_I3Particle=globals.angle_reco,
+                 EnergyReco_I3Particle=None,
+                 Use_Laputop=True,
+                 LaputopParamsName=globals.energy_reco,
+                 OutputFileName=args.pdf_file,
+                 BinEdges5D=globals.binedges,
+                 DistinctRegionsBinEdges3D = globals.binedges_DR,
+                 RunMode=args.RunMode)
     else:
         tray.Add(IceTop_LLHRatio,'calc_llhr',
-                 Hits_I3VectorShieldHitRecord='ITLLHR_Hits',
-                 Unhits_I3VectorShieldHitRecord='ITLLHR_Unhits',
-                 Excluded_I3VectorShieldHitRecord='ITLLHR_Excluded',
-                 AngularReco_I3Particle='Laputop',
-                 # EnergyReco_I3Particle=reco_track1,
-                 LaputopParamsName='LaputopParams',
-                 SigPDFInputFileName='hist2.hdf',
-                 BkgPDFInputFileName='hist.hdf',
-                 RunMode='CalcLLHR',
-                 SubtractEventFromPDF='Sig')
+                 Hits_I3VectorShieldHitRecord=globals.hits_shield_vector,
+                 Unhits_I3VectorShieldHitRecord=globals.unhits_shield_vector,
+                 Excluded_I3VectorShieldHitRecord=globals.ex_shield_vector,
+                 AngularReco_I3Particle=globals.angle_reco,
+                 EnergyReco_I3Particle=None,
+                 Use_Laputop=True,
+                 LaputopParamsName=globals.energy_reco,
+                 SigPDFInputFileName=args.sig_pdf,
+                 BkgPDFInputFileName=args.bkg_pdf,
+                 RunMode=args.RunMode,
+                 SubtractEventFromPDF=args.SubtractEventFromPDF,
+                 Output=globals.llhr_objname)
 
         tray.Add("I3Writer", "EventWriter",
                  Filename=args.outfile+".i3.zst",
                  streams=[icetray.I3Frame.DAQ, icetray.I3Frame.Physics],
                  DropOrphanStreams=[icetray.I3Frame.DAQ],
                  )
+                  
+        hdf_service = I3HDFTableService(args.outfile+'.hd5') 
 
-
+        tray.Add(I3TableWriter, "tablewriter",
+                 Keys = globals.book_keys, 
+                 TableService = [hdf_service],
+                 SubEventStreams = ["ice_top"]
+                )
+                  
     tray.Execute()
     tray.Finish()

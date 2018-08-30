@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 # 
 ## copyright  (C) 2018
@@ -10,12 +9,11 @@
 # @date $LastChangedDate$
 # @author Hershal Pandya <hershal@udel.edu> Last changed by: $LastChangedBy$
 #
+
 import numpy as np
+
 logEnergyBins = np.linspace(3,8,26)
 logEnergyBins=np.array([logEnergyBins[i] for i in range(len(logEnergyBins)) if i%2==0],dtype=float)
-
-logS125Bins = np.linspace(-0.5,3.0,36)
-cosZenlaputopBins = np.linspace(0.7,1.0,7)
 
 cosZenBin0 = 0.86
 cosZenBins = np.linspace(cosZenBin0, 1.0+ np.finfo(float).eps , (1-cosZenBin0)/0.01+1)
@@ -41,9 +39,9 @@ logTBins = np.hstack([excludedTime-0.5*deltaT, logTBins])
 
 logDBins = np.linspace(0,3.5,36) 
 
+
 pulses1='Shield_HLCSLCTimeCorrectedTankMerged_SplineMPEfast_SRT_Split_InIcePulses_singleHits'
 pulses2='Shield_HLCSLCTimeCorrectedTankMerged_SplineMPEfast_SRT_Split_InIcePulses_singleHits_UnHit'
 pulses3='IceTopExcludedTanks'
 reco_track2='SplineMPEfast_SRT_Split_InIcePulses'
 reco_track1='MuEx_mie_SplineMPEfast_SRT_Split_InIcePulses'
-

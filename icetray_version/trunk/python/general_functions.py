@@ -14,7 +14,6 @@ import numpy as np
 import tables
 
 
-
 def signed_log(t):
      return np.sign(t)*np.log10(np.absolute(t)+1)
 
@@ -177,7 +176,7 @@ def create_5D_PDF_file(OutputFileName,hist,binedges,
 
 def calc_LLHR(in_array, sig_hist, bkg_hist, binedges, 
               distinct_regions_binedges, SubtractEventFromPDF):
-              
+    from icecube.icetray.i3logging import log_fatal,log_warn              
     from llh_ratio_nd import get_slice_vector,log_likelihood_ratio              
     
     d={}
@@ -187,6 +186,7 @@ def calc_LLHR(in_array, sig_hist, bkg_hist, binedges,
     d['llh_sig'] = 0.
     d['llh_bkg'] = 0.
     d['isGood'] = 0.
+    d['tanks_have_nans']=0.
 
     logE=in_array[0][0]
     coszen=in_array[0][1]
@@ -214,6 +214,10 @@ def calc_LLHR(in_array, sig_hist, bkg_hist, binedges,
     in_array = (in_array.T[2:]).T
     binedges = binedges[2:]
     event_hist,temp = np.histogramdd(in_array, binedges)    
+    
+    # store status if any of the q, t, r values have nans in this event
+    if np.isnan(in_array[0][0]).any() or np.isnan(in_array[0][1]).any() or np.isnan(in_array[0][2]).any():
+        d['tanks_have_nans']=1.
     
     # subtract the event from the PDF if it was used for generating the PDF
     if SubtractEventFromPDF:
@@ -253,10 +257,49 @@ def calc_LLHR(in_array, sig_hist, bkg_hist, binedges,
         d['n_extrapolations_bkg_PDF'] += temp[2]
         d['llh_sig'] += temp[5]
         d['llh_bkg'] += temp[6]
-
+        
+        if np.isnan(temp[5]) or np.isnan(temp[6]):
+            d['isGood']=0.
+        
+        # the following diagnostics are not being returned 
         extrapolated_sig_PDF = temp[3]
         extrapolated_bkg_PDF = temp[4]
         llh_map_sig[slice_vector]=temp[7]
         llh_map_bkg[slice_vector]=temp[8]
 
     return d
+    
+def print_length(frame, key):
+    from icecube import dataclasses
+    if key in frame:
+        getpulse=dataclasses.I3RecoPulseSeriesMap.from_frame(frame,key)
+        print('len({}) = {}'.format(key, len(getpulse)))
+    return
+
+def print_length2(frame, key):
+    from icecube import dataclasses
+    if key in frame:
+        print('len({}) = {}'.format(key, len(frame[key])))
+
+def merge_excluded_tanks_lists(frame, 
+                                MergedListName=None,
+                                ListofExcludedTanksLists=[]):
+    from icecube import dataclasses
+    exclude = dataclasses.TankKey.I3VectorTankKey()
+    for tag in ListofExcludedTanksLists:
+        if tag in frame:
+            tanks = frame[tag]
+            for key in tanks:
+                if key not in exclude:
+                    exclude.append(key)
+
+    if MergedListName in frame:
+         frame.Delete(MergedListName)
+
+    frame.Put(MergedListName, exclude)
+    return
+
+def print_key(frame, key):
+    from icecube import dataclasses
+    if key in frame:
+        print('{} = {}'.format(key, frame[key]))

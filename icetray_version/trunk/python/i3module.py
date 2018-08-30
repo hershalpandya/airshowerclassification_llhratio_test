@@ -90,11 +90,15 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         self.AddParameter('EnergyReco_I3Particle',
                           'I3Particle from which logEnergy is to be drawn',
                           None)
+        self.AddParameter('Use_Laputop',
+                          'Whether to use LaputopParams',
+                          True)                          
         self.AddParameter('LaputopParamsName',
-                          'LaputopParams from which logS125 is to be drawn only accepted if EnergyReco_I3Particle not provided',
+                          'LaputopParams from which logS125 is to be drawn',
                           None)
         self.AddParameter('RunMode','Options: GeneratePDF / CalcLLHR',None)
         self.AddParameter('Output','Name of the output container','IceTopLLHR')
+
 
         # inputs for RunMode CalcLLHR
         self.AddParameter('OutputFileName','',None)
@@ -125,6 +129,7 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         self.ExcludedName = self.GetParameter('Excluded_I3VectorShieldHitRecord')
         self.AngularRecoName = self.GetParameter('AngularReco_I3Particle')
         self.EnergyRecoName = self.GetParameter('EnergyReco_I3Particle')
+        self.Use_Laputop = self.GetParameter('Use_Laputop')
         self.LaputopParamsName = self.GetParameter('LaputopParamsName')
         self.RunMode = self.GetParameter('RunMode')
         self.Decimals= self.GetParameter('DecimalsForSanityCheck')
@@ -258,7 +263,7 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         frame.Put(self.objname,dataclasses.I3MapStringDouble(d))
         return
 
-    def _create_in_array(self,frame):
+    def _create_in_array(self,frame,time_transformation=np.log10):
         """
         Create the IceTop specific input array that goes into
         GeneratePDF / CalcLLHR .
@@ -266,13 +271,10 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         adapted for each analysis.
         """
         
-        if self.EnergyRecoName:
+        if not self.Use_Laputop:
             En = np.log10(frame[self.EnergyRecoName].energy)
-        elif self.LaputopParamsName:
-            En = frame[self.LaputopParamsName].value(recclasses.LaputopParameter.Log10_S125)
-            # En = np.log10(frame[self.LaputopParamsName].s125)
         else:
-            log_fatal('One of EnergyRecoName_I3Particle or LaputopParamsName needs to be given')
+            En = frame[self.LaputopParamsName].value(recclasses.LaputopParameter.Log10_S125)
 		
         ze = np.cos(frame[self.AngularRecoName].dir.zenith)
 		
@@ -280,24 +282,24 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         unhits = frame[self.UnhitsName]
         excluded = frame[self.ExcludedName]
 
-        #hits_t, hits_q, hits_r = np.array([[signed_log(hit.time_residual),np.log10(hit.charge), log_plus_one(hit.distance)] for hit in hits]).T
+        #hits_t, hits_q, hits_r = np.array([[time_transformation(hit.time_residual),np.log10(hit.charge), log_plus_one(hit.distance)] for hit in hits]).T
 
-        hits_t = signed_log(np.array([hit.time_residual for hit in hits]))
+        hits_t = time_transformation(np.array([hit.time_residual for hit in hits]))
         hits_q = np.log10(np.array([hit.charge for hit in hits]))
         hits_r = log_plus_one(np.array([hit.distance for hit in hits]))
         hits_E = np.ones_like(hits_r)*En
         hits_z = np.ones_like(hits_r)*ze
 
-
-        #unhits_t, unhits_q, unhits_r = np.array([[signed_log(hit.time_residual),np.log10(hit.charge), log_plus_one(hit.distance)] for hit in unhits]).T
-        unhits_t = signed_log(np.array([hit.time_residual for hit in unhits]))
+        
+        #unhits_t, unhits_q, unhits_r = np.array([[time_transformation(hit.time_residual),np.log10(hit.charge), log_plus_one(hit.distance)] for hit in unhits]).T
+        unhits_t = time_transformation(np.array([hit.time_residual for hit in unhits]))
         unhits_q = np.log10(np.array([hit.charge for hit in unhits]))
         unhits_r = log_plus_one(np.array([hit.distance for hit in unhits]))
         unhits_E = np.ones_like(unhits_r)*En
         unhits_z = np.ones_like(unhits_r)*ze
 
-        #excluded_t, excluded_q, excluded_r = np.array([[signed_log(hit.time_residual),np.log10(hit.charge), log_plus_one(hit.distance)] for hit in excluded]).T
-        excluded_t = signed_log(np.array([hit.time_residual for hit in excluded]))
+        #excluded_t, excluded_q, excluded_r = np.array([[time_transformation(hit.time_residual),np.log10(hit.charge), log_plus_one(hit.distance)] for hit in excluded]).T
+        excluded_t = time_transformation(np.array([hit.time_residual for hit in excluded]))
         excluded_q = np.log10(np.array([hit.charge for hit in excluded]))
         excluded_r = log_plus_one(np.array([hit.distance for hit in excluded]))
         excluded_E = np.ones_like(excluded_r)*En
@@ -318,7 +320,7 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
             #print 't',t
             #print 'q',q
             #print 'r',r
-            log_warn('signed_time/logq/logr have nans')
+            log_warn('signed_time/logq/logr have nans, logs125%.2f coszen%.2f'%(En,ze))
 
               
         in_array=np.vstack([E,z,q,t,r]).T
