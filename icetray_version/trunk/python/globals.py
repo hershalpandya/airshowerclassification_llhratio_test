@@ -14,6 +14,9 @@ import numpy as np
 logEnergyBins = np.linspace(3,8,26)
 logEnergyBins=np.array([logEnergyBins[i] for i in range(len(logEnergyBins)) if i%2==0],dtype=float)
 
+logS125Bins = np.linspace(-0.5,3.0,36)
+cosZenlaputopBins = np.linspace(0.7,1.0,7)
+
 cosZenBin0 = 0.86
 cosZenBins = np.linspace(cosZenBin0, 1.0+ np.finfo(float).eps , (1-cosZenBin0)/0.01+1)
 cosZenBins=np.array([cosZenBins[i] for i in range(len(cosZenBins)) if i%2==0],dtype=float)

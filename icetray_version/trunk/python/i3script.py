@@ -18,13 +18,14 @@ import argparse
 import numpy as np
 
 from icecube import icetray, dataclasses, dataio, recclasses, shield
+from icecube import icetop_Level3_scripts
 from icecube.frame_object_diff.segments import uncompress
 from I3Tray import I3Tray
 from icecube.tableio import I3TableWriter
 from icecube.hdfwriter import I3HDFTableService
 
 from i3module import IceTop_LLHRatio
-from globals import (logEnergyBins, cosZenBins,
+from globals import (logS125Bins, cosZenlaputopBins,
                      logChargeBins, logDBins, logTBins, pulses1, pulses2,
                      pulses3, reco_track2, reco_track1)
 from general_functions import rotate_to_shower_cs
@@ -97,10 +98,15 @@ if __name__ == '__main__':
 
     icetop_excluded_tanks_lists=['IceTopHLCSeedRTExcludedTanks']
 
+    def make_qc(frame):
+        o=frame['IT73AnalysisIceTopQualityCuts']
+        return np.array(o.values()).all()
+        
+    tray.Add(make_qc,'make qc')                   
     tray.Add(merge_excluded_tanks_lists,'mergethem',
              MergedListName='IceTopExcludedTanksAll',
              ListofExcludedTanksLists=icetop_excluded_tanks_lists)
-    
+    #tray.Add(print_key,key='I3EventHeader')
     tray.Add(Generate_Input_IceTop_LLHRatio,'create inputs for next module',
              HLCTankPulsesName='IceTopHLCSeedRTPulses',
              SLCTankPulsesName='IceTopLaputopSeededSelectedSLC',
@@ -119,7 +125,7 @@ if __name__ == '__main__':
     #tray.Add(print_length2,key='TankPulseMergerExcludedSLCTanks')
     #tray.Add(print_length2,key='IceTopExcludedTanksAll')
     #tray.Add(print_key,key='IceTopExcludedTanksAll')
-    tray.Add(print_key,key='I3EventHeader')
+    #tray.Add(print_key,key='I3EventHeader')
     #tray.Add(print_length,key='IceTopHLCSeedRTPulses')
     #tray.Add(print_length,key='IceTopLaputopSeededSelectedSLC')
     #tray.Add(print_length2,key='ITLLHR_Hits')
@@ -135,23 +141,24 @@ if __name__ == '__main__':
                  # EnergyReco_I3Particle=reco_track1,
                  LaputopParamsName='LaputopParams',
                  OutputFileName='hist2.hdf',
-                 BinEdges5D=[logEnergyBins,cosZenBins,logChargeBins,logTBins,logDBins],
+                 BinEdges5D=[logS125Bins,cosZenlaputopBins,logChargeBins,logTBins,logDBins],
                  DistinctRegionsBinEdges3D = [[logChargeBins,logTBins,logDBins]],
                  RunMode='GeneratePDF')
     else:
         tray.Add(IceTop_LLHRatio,'calc_llhr',
-                 Hits_I3VectorShieldHitRecord=pulses1,
-                 Unhits_I3VectorShieldHitRecord=pulses2+'_llhr',
-                 Excluded_I3VectorShieldHitRecord=pulses3+'_llhr',
-                 AngularReco_I3Particle=reco_track2,
-                 EnergyReco_I3Particle=reco_track1,
-                 SigPDFInputFileName='hist2.hd5',
-                 BkgPDFInputFileName='hist.hd5',
+                 Hits_I3VectorShieldHitRecord='ITLLHR_Hits',
+                 Unhits_I3VectorShieldHitRecord='ITLLHR_Unhits',
+                 Excluded_I3VectorShieldHitRecord='ITLLHR_Excluded',
+                 AngularReco_I3Particle='Laputop',
+                 # EnergyReco_I3Particle=reco_track1,
+                 LaputopParamsName='LaputopParams',
+                 SigPDFInputFileName='hist2.hdf',
+                 BkgPDFInputFileName='hist.hdf',
                  RunMode='CalcLLHR',
                  SubtractEventFromPDF='Sig')
 
         tray.Add("I3Writer", "EventWriter",
-                 Filename=os.path.join(args.outfile, ".i3.zst"),
+                 Filename=args.outfile+".i3.zst",
                  streams=[icetray.I3Frame.DAQ, icetray.I3Frame.Physics],
                  DropOrphanStreams=[icetray.I3Frame.DAQ],
                  )

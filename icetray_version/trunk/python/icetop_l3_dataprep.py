@@ -96,7 +96,7 @@ class Generate_Input_IceTop_LLHRatio(icetray.I3ConditionalModule):
         self.PushFrame(frame)
 
     def Physics(self,frame):
-      
+        
         #initiate output vectors
         hits = recclasses.I3VectorShieldHitRecord() 
         unhits = recclasses.I3VectorShieldHitRecord() 
@@ -110,9 +110,11 @@ class Generate_Input_IceTop_LLHRatio(icetray.I3ConditionalModule):
         
         # populate hits vector
         for tankpulses in [self.slc_name, self.hlc_name]:
+
             pulses = dataclasses.I3RecoPulseSeriesMap.from_frame(frame,tankpulses)
 
             for omkey,pulse_items in pulses.iteritems():
+
                 if not omkey in self.geometry.omgeo:
                     log_fatal("OM {om} not in geometry!".format(om=k))
 
@@ -127,7 +129,7 @@ class Generate_Input_IceTop_LLHRatio(icetray.I3ConditionalModule):
                 for pulse in pulse_items:
                     #calculate the tank's location/ time in shower frame ref
                     # time is w.r.t. planar shower front arrival time at tank location
-
+                    
                     position = self.geometry.omgeo[omkey].position
                     det_cs_position = np.array([[position.x],
                                       [position.y],

@@ -17,6 +17,14 @@ import tables
 from icecube.icetray.i3logging import log_fatal,log_warn
 from llh_ratio_nd import get_slice_vector,log_likelihood_ratio
 from general_functions import signed_log, log_plus_one, check_distinct_regions_add_up_to_full
+import resource
+print 'ram usage lib import',resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+
+def RAM_test(max_RAM=1024.*10):
+    RAM=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1. / 1024.
+    if (RAM - 400)>max_RAM:
+        raise Exception('RAM usage %s exceeded max_RAM %s'%(RAM,max_RAM))
+    return RAM
 
 class IceTop_LLHRatio(icetray.I3ConditionalModule):
     """
@@ -103,9 +111,8 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         self.AddParameter('DecimalsForSanityCheck',
                           'Consistency checks will compare values rounded to these N decimals.Default:2',2)
         self.AddParameter('SubtractEventFromPDF',
-                          'subtract the event from the PDF if it was used for generating the PDF.Otherwise you are overfitting.
-                          So if you use {A} events to make SigPDF, while calculating llhratio for {A} events, you must 
-                          set this option to "Sig". Options: Sig, Bkg. Default:None',None)
+                          'subtract the event from the PDF if it was used for generating the PDF.Options: Sig, Bkg. Default:None',
+                          None)
         return
 
     def Configure(self):
@@ -160,6 +167,7 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         """
         Either Generate PDFs or Calc LLHR. 
         """
+        
         if self.RunMode=='GeneratePDF':
             self._GenPDFsPhysics(frame)
         elif self.RunMode=='CalcLLHR':
@@ -210,16 +218,21 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         Pretty much all that is done during GeneratePDF mode.
         i.e. to fill up the histogram initialized during Configure.
         """
-        h,edges=np.histogramdd(sample,self.binedges)
-
+                	
+        h,edges=np.histogramdd(sample=sample,bins=self.binedges)
+        
         if np.shape(h)!=np.shape(self.hist):
             log_fatal('initialized histogram and fill histogram dont match in shape')
-
+        
         self.hist+= h
         self.n_events+=1
+
+        #print self.n_events, np.sum(self.hist), np.sum(self.hist)/162., np.sum(h)
+        #print RAM_test()
         return
 
     def _GenPDFsPhysics(self,frame):
+
         in_array=self._create_in_array(frame)
         self._fill(in_array)
         return
@@ -235,11 +248,13 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         """
         from general_functions import calc_LLHR
 
-        d= calc_LLHR(self.in_array, self.sig_hist, 
+        in_array= self._create_in_array(frame)
+        
+        d= calc_LLHR(in_array, self.sig_hist, 
                      self.bkg_hist, self.binedges, 
                      self.distinct_regions_binedges, 
                      self.SubtractEventFromPDF)
-
+        
         frame.Put(self.objname,dataclasses.I3MapStringDouble(d))
         return
 
@@ -250,6 +265,7 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         This is method will need to be 
         adapted for each analysis.
         """
+        
         if self.EnergyRecoName:
             En = np.log10(frame[self.EnergyRecoName].energy)
         elif self.LaputopParamsName:
@@ -257,9 +273,9 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
             # En = np.log10(frame[self.LaputopParamsName].s125)
         else:
             log_fatal('One of EnergyRecoName_I3Particle or LaputopParamsName needs to be given')
-
+		
         ze = np.cos(frame[self.AngularRecoName].dir.zenith)
-
+		
         hits = frame[self.HitsName]
         unhits = frame[self.UnhitsName]
         excluded = frame[self.ExcludedName]
@@ -299,11 +315,18 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
             log_fatal('Total Tanks in Event not 162')
 
         if np.isnan(t).any() or np.isnan(q).any() or np.isnan(r).any():
-            print 't',t
-            print 'q',q
-            print 'r',r
+            #print 't',t
+            #print 'q',q
+            #print 'r',r
             log_warn('signed_time/logq/logr have nans')
 
+              
         in_array=np.vstack([E,z,q,t,r]).T
-
+        
+        #for edges,var in zip(self.binedges,in_array.T):
+        #    print np.amin(edges), np.amax(edges)
+        #    print np.amin(var), np.amax(var), np.shape(var)
+        #    #print var[42:87]
+        #    print '-----'
+        #print '========='
         return in_array
