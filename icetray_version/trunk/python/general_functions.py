@@ -11,6 +11,8 @@
 # @author Hershal Pandya <hershal@udel.edu> Last changed by: $LastChangedBy$
 #
 import numpy as np
+import tables
+
 
 
 def signed_log(t):
@@ -43,7 +45,10 @@ def check_distinct_regions_add_up_to_full(distinct_regions_binedges,binedges,dec
                 next_one=i+1
             else:
                 next_one=0
-            intersection=np.intersect1d(np.round(distinct_regions_binedges[i][j],decimals=decimals),np.round(distinct_regions_binedges[next_one][j],decimals=decimals))
+            intersection=np.intersect1d(
+                        np.round(distinct_regions_binedges[i][j],decimals=decimals),
+                        np.round(distinct_regions_binedges[next_one][j],decimals=decimals)
+                        )
             if len(intersection)>1 and len(intersection)!=len(binedges[j]):
                 print 'comparing "Distinct" regions %i and %i, dimension %i'%(i,next_one,j)
                 print 'These regions Intersect'
@@ -96,7 +101,7 @@ def to_shower_cs(fit):
     return d_theta*d_phi
 
 
-def load_5D_PDF_from_file(SigPDFFileName,BkgPDFFileName):
+def load_5D_PDF_from_file(SigPDFFileName,BkgPDFFileName,decimals=2):
     '''
     this part is hard wired for 5 dimensional PDFs
     distinct regions are fixed to 3
@@ -104,7 +109,8 @@ def load_5D_PDF_from_file(SigPDFFileName,BkgPDFFileName):
 
     f=tables.open_file(SigPDFFileName,'r')
     sig_hist = f.root.hist[:]
-    binedges = [ f.root.binedges_0[:], f.root.binedges_1[:], f.root.binedges_2[:],  f.root.binedges_3[:] , f.root.binedges_4[:]]
+    binedges = [ f.root.binedges_0[:], f.root.binedges_1[:], f.root.binedges_2[:],  
+                 f.root.binedges_3[:] , f.root.binedges_4[:]]
     distinct_regions_binedges = [ ]
     for r in range(1):
         region_binedges=[]
@@ -118,7 +124,8 @@ def load_5D_PDF_from_file(SigPDFFileName,BkgPDFFileName):
 
     f=tables.open_file(BkgPDFFileName,'r')
     bkg_hist = f.root.hist[:]
-    binedges = [ f.root.binedges_0[:], f.root.binedges_1[:], f.root.binedges_2[:],  f.root.binedges_3[:] , f.root.binedges_4[:]]
+    binedges = [ f.root.binedges_0[:], f.root.binedges_1[:], f.root.binedges_2[:],  
+                 f.root.binedges_3[:] , f.root.binedges_4[:]]
     labels = f.root.labels[:]
     bkg_n_events = f.root.n_events[:]
     f.close()
@@ -130,7 +137,7 @@ def load_5D_PDF_from_file(SigPDFFileName,BkgPDFFileName):
         raise Exception('Inconsistency found')
 
     for i in range(len(binedges)):
-        are_equal=(np.round(binedges[i],decimals=Decimals)==np.round(binedges[i],decimals=Decimals)).all()
+        are_equal=(np.round(binedges[i],decimals=decimals)==np.round(binedges[i],decimals=decimals)).all()
         if not are_equal:
             print 'sig binedges dim %i'%i, binedges[i]
             print 'bkg binedges dim %i'%i, binedges[i]
@@ -143,7 +150,8 @@ def load_5D_PDF_from_file(SigPDFFileName,BkgPDFFileName):
     return sig_hist,bkg_hist,binedges,distinct_regions_binedges, labels, sig_n_events, bkg_n_events
 
 
-def create_5D_PDF_file(OutputFileName,hist,binedges,distinct_regions_binedges,labels):
+def create_5D_PDF_file(OutputFileName,hist,binedges,
+                       distinct_regions_binedges,labels,n_events):
     # generate the outputfile. save histogram.
     f=tables.open_file(OutputFileName,'w')
     f.create_carray('/', 'hist', obj=hist,filters=tables.Filters(complib='blosc:lz4hc', complevel=1))
@@ -167,26 +175,11 @@ def create_5D_PDF_file(OutputFileName,hist,binedges,distinct_regions_binedges,la
 
     return
 
-def calc_LLHR(in_array, sig_hist, bkg_hist, binedges, distinct_regions_binedges, SubtractEventFromPDF):
-    """
-    Step 1. In this code, the in_array will be histogrammed using binedges that were also 
-    used for sig_hist, bkg_hist . 
+def calc_LLHR(in_array, sig_hist, bkg_hist, binedges, 
+              distinct_regions_binedges, SubtractEventFromPDF):
+              
+    from llh_ratio_nd import get_slice_vector,log_likelihood_ratio              
     
-    Step 2. Appropriate slice of the sig_hist, bkg_hist will be taken
-    based on Energy and zenith of this event. Stored in first two
-    elements of in_array. First two dimensions of the PDF are reserved
-    for energy and zenith.
-
-    Step 3. LLH Ratio will be calculated after splitting histogrammed event,
-    sig_hist, bkg_hist into the distinct_regions . Then llh ratios from each
-    distinct region will be summed up to generate a total llh ratio.
-    
-    SubtractEventFromMap==Sig/Bkg means whether this event was used for construction
-    of the Sig/Bkg PDFs. If so, it needs to be removed from the corresponding PDF 
-    before using the PDF for calculating the llh ratio. Otherwise it would lead
-    to overfitting/bias (since the probability of this event is affected by itself).
-    """
-
     d={}
     d['llh_ratio']= 0.
     d['n_extrapolations_sig_PDF'] = 0.
@@ -197,11 +190,6 @@ def calc_LLHR(in_array, sig_hist, bkg_hist, binedges, distinct_regions_binedges,
 
     logE=in_array[0][0]
     coszen=in_array[0][1]
-
-    # select Q, T, R dimensions, generate event histogram
-    in_array = (in_array.T[2:]).T
-    binedges = binedges[2:]
-    event_hist,temp = np.histogramdd(in_array, binedges)
 
     # check if event logE and coszen lies within range of binedges
     if logE>binedges[0][-1] or logE<binedges[0][0]:
@@ -221,6 +209,12 @@ def calc_LLHR(in_array, sig_hist, bkg_hist, binedges, distinct_regions_binedges,
 
     sig_hist = sig_hist[Ebin][cZbin]
     bkg_hist = bkg_hist[Ebin][cZbin]
+
+    # select Q, T, R dimensions, generate event histogram
+    in_array = (in_array.T[2:]).T
+    binedges = binedges[2:]
+    event_hist,temp = np.histogramdd(in_array, binedges)    
+    
     # subtract the event from the PDF if it was used for generating the PDF
     if SubtractEventFromPDF:
         if SubtractEventFromPDF=='Sig':
