@@ -302,6 +302,24 @@ def merge_excluded_tanks_lists(frame,
     frame.Put(MergedListName, exclude)
     return
 
+def bad_doms_list_to_bad_tanks_list(frame, BadDomsList='BadDomsList', 
+                                    BadTanksList='BadTanksList'):
+    from icecube import dataclasses
+    bd_list = frame[BadDomsList]
+    bt_list = dataclasses.TankKey.I3VectorTankKey()
+    for dom in bd_list:
+        if dom.om >=61:
+            new_tank = dataclasses.TankKey()
+            new_tank.string = dom.string
+            if dom.om==61 or dom.om==62:
+                new_tank.tank = new_tank.TankA
+            else:
+                new_tank.tank = new_tank.TankB
+
+            bt_list.append(new_tank)
+    frame.Put(BadTanksList,bt_list)
+    return
+    
 def print_key(frame, key):
     from icecube import dataclasses
     if key in frame:

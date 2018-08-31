@@ -19,8 +19,8 @@ logDBins  = np.linspace(0,3.5,36)
 logQBins  = np.linspace(-3,4,71)
 
 uh_q  = ex_q = 1e-3
-uh_t  = ex_t  = np.power(10,-1.95)
-
+# in signed_log, i want 1.95
+uh_t  = ex_t  = -1*(np.power(10,1.95)-1.)
 
 hit_region  = [logQBins, logTBins[1:], logDBins ]
 unhit_ex_region  = [logQBins, logTBins[:2], logDBins ]                        
@@ -29,7 +29,7 @@ binedges = [logEBins, cosZenBins, logQBins, logTBins, logDBins]
 
 hlc_tank_pulses = 'IceTopHLCSeedRTPulses'
 slc_tank_pulses =  'IceTopLaputopSeededSelectedSLC'
-ex_tanks_list = 'IceTopExcludedTanksAll'
+ex_tanks_list = 'BadTanksList'
 
 hits_shield_vector = 'ITLLHR_Hits'
 unhits_shield_vector = 'ITLLHR_Unhits'

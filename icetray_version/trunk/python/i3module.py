@@ -263,7 +263,7 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         frame.Put(self.objname,dataclasses.I3MapStringDouble(d))
         return
 
-    def _create_in_array(self,frame,time_transformation=np.log10):
+    def _create_in_array(self,frame,time_transformation=signed_log):
         """
         Create the IceTop specific input array that goes into
         GeneratePDF / CalcLLHR .
@@ -282,23 +282,18 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         unhits = frame[self.UnhitsName]
         excluded = frame[self.ExcludedName]
 
-        #hits_t, hits_q, hits_r = np.array([[time_transformation(hit.time_residual),np.log10(hit.charge), log_plus_one(hit.distance)] for hit in hits]).T
-
         hits_t = time_transformation(np.array([hit.time_residual for hit in hits]))
         hits_q = np.log10(np.array([hit.charge for hit in hits]))
         hits_r = log_plus_one(np.array([hit.distance for hit in hits]))
         hits_E = np.ones_like(hits_r)*En
         hits_z = np.ones_like(hits_r)*ze
-
         
-        #unhits_t, unhits_q, unhits_r = np.array([[time_transformation(hit.time_residual),np.log10(hit.charge), log_plus_one(hit.distance)] for hit in unhits]).T
         unhits_t = time_transformation(np.array([hit.time_residual for hit in unhits]))
         unhits_q = np.log10(np.array([hit.charge for hit in unhits]))
         unhits_r = log_plus_one(np.array([hit.distance for hit in unhits]))
         unhits_E = np.ones_like(unhits_r)*En
         unhits_z = np.ones_like(unhits_r)*ze
 
-        #excluded_t, excluded_q, excluded_r = np.array([[time_transformation(hit.time_residual),np.log10(hit.charge), log_plus_one(hit.distance)] for hit in excluded]).T
         excluded_t = time_transformation(np.array([hit.time_residual for hit in excluded]))
         excluded_q = np.log10(np.array([hit.charge for hit in excluded]))
         excluded_r = log_plus_one(np.array([hit.distance for hit in excluded]))
@@ -322,13 +317,6 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
             #print 'r',r
             log_warn('signed_time/logq/logr have nans, logs125%.2f coszen%.2f'%(En,ze))
 
-              
         in_array=np.vstack([E,z,q,t,r]).T
         
-        #for edges,var in zip(self.binedges,in_array.T):
-        #    print np.amin(edges), np.amax(edges)
-        #    print np.amin(var), np.amax(var), np.shape(var)
-        #    #print var[42:87]
-        #    print '-----'
-        #print '========='
         return in_array

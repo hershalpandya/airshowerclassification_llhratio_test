@@ -14,6 +14,7 @@ import numpy as np
 from icecube.icetray.i3logging import log_fatal,log_warn
 from icecube.dataclasses import I3Constants
 from general_functions import to_shower_cs
+import copy
 
 class Generate_Input_IceTop_LLHRatio(icetray.I3ConditionalModule):
     """
@@ -101,12 +102,33 @@ class Generate_Input_IceTop_LLHRatio(icetray.I3ConditionalModule):
         hits = recclasses.I3VectorShieldHitRecord() 
         unhits = recclasses.I3VectorShieldHitRecord() 
         excluded = recclasses.I3VectorShieldHitRecord()
-        not_unhit=[] # will keep track of hit+excluded doms 
+        dom_already_listed=[] # will keep track of hit+excluded doms 
 
         #load reconstruction
         axis=frame[self.reco_name]
         rotation = to_shower_cs(axis)
         origin = np.array([[axis.pos.x], [axis.pos.y], [axis.pos.z]])
+        
+        # populate excluded vector
+        tanklist = frame[self.excluded_name]
+        for tank in tanklist:
+            dom_already_listed.append(tank.default_omkey)
+            new_pulse = recclasses.I3ShieldHitRecord()
+            # new_pulse.DOMkey = tank
+            new_pulse.DOMkey = tank.default_omkey
+            new_pulse.charge = self.exc_fake_q
+            new_pulse.time_residual = self.exc_fake_t 
+
+            position = self.geometry.omgeo[new_pulse.DOMkey].position
+
+            det_cs_position = np.array([[position.x],
+                              [position.y],
+                              [position.z]])
+            shower_cs_position = rotation*(det_cs_position - origin)
+            shower_cs_radius = np.sqrt(shower_cs_position[0]**2 + shower_cs_position[1]**2)
+
+            new_pulse.distance = np.float(shower_cs_radius)
+            excluded.append(new_pulse)
         
         # populate hits vector
         for tankpulses in [self.slc_name, self.hlc_name]:
@@ -124,7 +146,22 @@ class Generate_Input_IceTop_LLHRatio(icetray.I3ConditionalModule):
                 if len(pulse_items)!=1:
                     log_fatal('only one pulse per omkey should be present. something might be fishy here.')
                 
-                not_unhit.append(omkey)
+                if omkey in dom_already_listed:
+                    log_warn("OM %s in %s already in %s"%(omkey,tankpulses,self.excluded_name))
+                    continue
+            
+                sister_dom = copy.deepcopy(omkey)
+                if omkey.om==61 or omkey.om==63:
+                    sister_dom.om= omkey.om +1
+                if omkey.om==62 or omkey.om==64:
+                    sister_dom.om= omkey.om -1
+                
+                if sister_dom in dom_already_listed:
+                    #log_warn("OMKey(39,61,0) is not functional so if the high-gain dom saturates, (39,62,0) gets a nan. For LLH Ratio calculation, we remove both of them to avoid the same tank showing up in hits as well as badtanks lists. Also, nan values are not helpful.")
+                    log_warn("OM %s 's sister dom %s in %s already in %s. Removing it from hits. "%(omkey,sister_dom,tankpulses,self.excluded_name))
+                    continue
+                
+                dom_already_listed.append(omkey)
 
                 for pulse in pulse_items:
                     #calculate the tank's location/ time in shower frame ref
@@ -148,36 +185,17 @@ class Generate_Input_IceTop_LLHRatio(icetray.I3ConditionalModule):
                     
                     hits.append(new_pulse)
 
-        # populate excluded vector
-        tanklist = frame[self.excluded_name]
-        for tank in tanklist:
-            not_unhit.append(tank.default_omkey)
-            new_pulse = recclasses.I3ShieldHitRecord()
-            # new_pulse.DOMkey = tank
-            new_pulse.DOMkey = tank.default_omkey
-            new_pulse.charge = self.exc_fake_q
-            new_pulse.time_residual = self.exc_fake_t 
-
-            position = self.geometry.omgeo[new_pulse.DOMkey].position
-
-            det_cs_position = np.array([[position.x],
-                              [position.y],
-                              [position.z]])
-            shower_cs_position = rotation*(det_cs_position - origin)
-            shower_cs_radius = np.sqrt(shower_cs_position[0]**2 + shower_cs_position[1]**2)
-
-            new_pulse.distance = np.float(shower_cs_radius)
-            excluded.append(new_pulse)
-
         #populate unhits vector
         stations = frame['I3Geometry'].stationgeo
         for station in stations:
             for tank in station.data():
-                is_unhit=0
+                is_unhit=True
+                # for each tank, both doms could contribute to is_unhit
                 for dom in tank.omkey_list:
-                    if dom not in not_unhit:
-                        is_unhit+=1
-                if is_unhit==2:
+                    if dom in dom_already_listed:
+                        is_unhit=False
+                
+                if is_unhit:
                     new_pulse=recclasses.I3ShieldHitRecord()
                     new_pulse.DOMkey = dom # pick the last one in the loop above
                     new_pulse.charge = self.unhit_fake_q 
@@ -194,7 +212,7 @@ class Generate_Input_IceTop_LLHRatio(icetray.I3ConditionalModule):
                     new_pulse.distance = np.float(shower_cs_radius)
                     unhits.append(new_pulse)
          
-        #put the results to frame
+        #put the results into frame
         frame.Put(self.HitsName, hits)
         frame.Put(self.UnhitsName, unhits)
         frame.Put(self.ExcludedName, excluded)

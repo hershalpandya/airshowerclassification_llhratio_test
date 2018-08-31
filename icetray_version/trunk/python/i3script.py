@@ -65,6 +65,18 @@ if __name__ == '__main__':
     icetray.logging.console()
     icetray.set_log_level(icetray.I3LogLevel.LOG_INFO)
 
+    old_infiles=args.inputs
+    print len(args.inputs)
+    args.inputs=[]
+    print len(args.inputs)    
+    for ttfile in old_infiles:
+        if ttfile=='/data/ana/CosmicRay/IceTop_level3/sim/IC86.2012/12362/Level3_IC86.2012_12362_Run000001.i3.gz':
+            print 'removed',ttfile
+            continue
+        args.inputs.append(ttfile)
+                   
+    print len(args.inputs)
+ 
     tray = I3Tray()
     tray.Add('I3Reader', filenamelist=args.inputs)
     
@@ -96,11 +108,17 @@ if __name__ == '__main__':
 
     # merge multiple excluded tanks lists into one
     #todo: add a module that converts BadDomsList from GCD to excluded tanks list
-    icetop_excluded_tanks_lists=['IceTopHLCSeedRTExcludedTanks']         
-    from general_functions import merge_excluded_tanks_lists
-    tray.Add(merge_excluded_tanks_lists,'mergethem',
-             MergedListName='IceTopExcludedTanksAll',
-             ListofExcludedTanksLists=globals.ex_tanks_list)
+    #icetop_excluded_tanks_lists=['IceTopHLCSeedRTExcludedTanks']         
+    #from general_functions import merge_excluded_tanks_lists
+    #tray.Add(merge_excluded_tanks_lists,'mergethem',
+    #         MergedListName='IceTopExcludedTanksAll',
+    #         ListofExcludedTanksLists=globals.ex_tanks_list)
+    from general_functions import bad_doms_list_to_bad_tanks_list
+    tray.Add(bad_doms_list_to_bad_tanks_list,'convert bad doms to tanks',
+             BadDomsList='BadDomsList',
+             BadTanksList=globals.ex_tanks_list)
+    #from general_functions import print_key             
+    #tray.Add(print_key,'d',key=globals.ex_tanks_list)
 
     tray.Add(Generate_Input_IceTop_LLHRatio,'create inputs for next module',
              HLCTankPulsesName=globals.hlc_tank_pulses,
