@@ -104,6 +104,9 @@ def load_5D_PDF_from_file(SigPDFFileName,BkgPDFFileName,decimals=2):
     '''
     this part is hard wired for 5 dimensional PDFs
     distinct regions are fixed to 3
+    input: SigPDFFileName, BkgPDFFileName, decimals
+    decimals is just accuracy while comparing two numbers
+    returns: sig_hist,bkg_hist,binedges,distinct_regions_binedges, labels, sig_n_events, bkg_n_events
     '''
 
     f=tables.open_file(SigPDFFileName,'r')
