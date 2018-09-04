@@ -14,7 +14,7 @@
 from icecube import phys_services, dataclasses, icetray, recclasses
 import numpy as np
 import tables
-from icecube.icetray.i3logging import log_fatal,log_warn
+from icecube.icetray.i3logging import log_fatal,log_warn, log_error
 from llh_ratio_nd import get_slice_vector,log_likelihood_ratio
 from general_functions import signed_log, log_plus_one, check_distinct_regions_add_up_to_full
 import resource
@@ -284,9 +284,21 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
 
         hits_t = time_transformation(np.array([hit.time_residual for hit in hits]))
         hits_q = np.log10(np.array([hit.charge for hit in hits]))
+        hits_qunlog = np.array([hit.charge for hit in hits])
         hits_r = log_plus_one(np.array([hit.distance for hit in hits]))
         hits_E = np.ones_like(hits_r)*En
         hits_z = np.ones_like(hits_r)*ze
+        hits_doms = np.array([hit.DOMkey for hit in hits])
+        
+        if np.isnan(hits_q).any():
+			select=np.isnan(hits_q)
+			log_error('nan q doms in %s'%self.HitsName)
+			log_error(zip(hits_q[select],hits_qunlog[select],hits_doms[select]))
+
+        if np.isnan(hits_t).any():
+			select=np.isnan(hits_t)
+			log_error('nan t doms in %s'%self.HitsName)
+			log_error(zip(hits_t[select],hits_doms[select]))
         
         unhits_t = time_transformation(np.array([hit.time_residual for hit in unhits]))
         unhits_q = np.log10(np.array([hit.charge for hit in unhits]))
@@ -308,7 +320,7 @@ class IceTop_LLHRatio(icetray.I3ConditionalModule):
         z = np.concatenate( (hits_z, unhits_z, excluded_z) )
 
         if len(t)!=162 or len(q)!=162 or len(r)!=162:
-            print 'N_t %s N_q %s N_r %s'%(len(t),len(q),len(r))
+            log_error('N_t %s N_q %s N_r %s'%(len(t),len(q),len(r)))
             log_fatal('Total Tanks in Event not 162')
 
         if np.isnan(t).any() or np.isnan(q).any() or np.isnan(r).any():

@@ -324,3 +324,104 @@ def print_key(frame, key):
     from icecube import dataclasses
     if key in frame:
         print('{} = {}'.format(key, frame[key]))
+
+
+def create_3D_PDF_file(OutputFileName,hist,binedges,
+                       labels,n_events):
+    # generate the outputfile. save histogram.
+    f=tables.open_file(OutputFileName,'w')
+    f.create_carray('/', 'hist', obj=hist,filters=tables.Filters(complib='blosc:lz4hc', complevel=1))
+
+    for i in range(len(binedges)):
+        f.create_carray('/', 'binedges_%i'%i,
+                        obj=binedges[i],
+                        filters=tables.Filters(complib='blosc:lz4hc',
+                        complevel=1))
+
+    f.create_carray('/', 'labels', obj=labels,filters=tables.Filters(complib='blosc:lz4hc', complevel=1))
+    f.create_carray('/', 'n_events', obj=[n_events],filters=tables.Filters(complib='blosc:lz4hc', complevel=1))
+    f.close()
+    return
+
+from icecube import icetray
+class Hist_ITLLHR(icetray.I3ConditionalModule):
+    """
+    Just a histogramming module
+    """
+
+    def __init__(self,ctx):
+        """
+        Initialize
+        Accept Input Parameters
+        """
+        icetray.I3ConditionalModule.__init__(self, ctx)
+
+        self.AddParameter('AngularReco_I3Particle',
+                          'I3Particle from which cosZenith is to be drawn',
+                          None)
+        self.AddParameter('EnergyReco_I3Particle',
+                          'I3Particle from which logEnergy is to be drawn',
+                          None)
+        self.AddParameter('IceTopLLHR_Container',
+                          'IceTopLLHR Container',
+                          None)                                
+        self.AddParameter('Use_Laputop',
+                          'Whether to use LaputopParams',
+                          True)                          
+        self.AddParameter('LaputopParamsName',
+                          'LaputopParams from which logS125 is to be drawn',
+                          None)
+        self.AddParameter('OutputFileName','',None)
+        self.AddParameter('BinEdges3D','[logE_edges, cosZen_edges, llhr_edges]',[])
+        return
+
+    def Configure(self):
+        """
+        Configure
+        Load Input Parameters as class members for easy access
+        """
+        self.ITLLHRName = self.GetParameter('IceTopLLHR_Container')
+        self.AngularRecoName = self.GetParameter('AngularReco_I3Particle')
+        self.EnergyRecoName = self.GetParameter('EnergyReco_I3Particle')
+        self.Use_Laputop = self.GetParameter('Use_Laputop')
+        self.LaputopParamsName = self.GetParameter('LaputopParamsName')
+        self.binedges = self.GetParameter('BinEdges3D')
+        self.OutputName = self.GetParameter('OutputFileName')
+        #initiate
+        histogram_shape= np.array([len(i)-1 for i in self.binedges])
+        self.hist=np.zeros(histogram_shape)
+        self.n_events=0
+        self.labels = ['logE', 'cosZ', 'llhr']        
+        return
+
+    def Physics(self,frame):
+        """
+        Either Generate PDFs or Calc LLHR. 
+        """
+        
+        if not self.Use_Laputop:
+            En = np.log10(frame[self.EnergyRecoName].energy)
+        else:
+            En = frame[self.LaputopParamsName].value(recclasses.LaputopParameter.Log10_S125)
+        ze = np.cos(frame[self.AngularRecoName].dir.zenith)
+        
+        llhr = frame[self.ITLLHRName]['llh_ratio']
+        
+        h,edges=np.histogramdd(sample=np.array([[En],[ze],[llhr]]).T,bins=self.binedges)
+        
+        if np.shape(h)!=np.shape(self.hist):
+            log_fatal('initialized histogram and fill histogram dont match in shape')
+        
+        self.hist+= h
+        
+        self.n_events+=1
+
+        self.PushFrame(frame)
+        
+        return
+
+    def Finish(self):
+        create_3D_PDF_file(self.OutputName,
+                           self.hist,self.binedges,
+                           self.labels, self.n_events)
+        return

@@ -18,6 +18,8 @@ import tables
 
 parser=OptionParser()
 parser.add_option('--output',dest='output',help='output hdf5 file',type='str',default=None)
+parser.add_option('--dimension',dest='dim',help='output hdf5 file',type='int',default=5)
+parser.add_option('--n_distinct_regions',dest='n_dr',help='output hdf5 file',type='int',default=3)
 (options,inputfilelist)=parser.parse_args()
 
 file1=inputfilelist[0]
@@ -39,18 +41,18 @@ for file2 in inputfilelist[1:]:
 f=tables.open_file(options.output,'w')
 f.create_carray('/', 'hist', obj=new_hist,filters=tables.Filters(complib='blosc:lz4hc', complevel=1))
 
-for i in range(5):
+for i in range(options.dim):
     f.create_carray('/', 'binedges_%i'%i, 
                     obj=eval('f1.root.binedges_%i[:]'%i),
                     filters=tables.Filters(complib='blosc:lz4hc', 
                     complevel=1))
-
-for i in range(1):
-    for j in range(3):
-        f.create_carray('/', 'region_%i_binedges_%i'%(i,j), 
-                        obj=eval('f1.root.region_%i_binedges_%i[:]'%(i,j)),
-                        filters=tables.Filters(complib='blosc:lz4hc', 
-                        complevel=1))
+if not options.n_dr==0:
+    for i in range(1):
+        for j in range(options.n_dr):
+            f.create_carray('/', 'region_%i_binedges_%i'%(i,j), 
+                            obj=eval('f1.root.region_%i_binedges_%i[:]'%(i,j)),
+                            filters=tables.Filters(complib='blosc:lz4hc', 
+                            complevel=1))
 
 f.create_carray('/', 'labels', obj=f1.root.labels[:],filters=tables.Filters(complib='blosc:lz4hc', complevel=1))
 f.create_carray('/', 'n_events', obj=[n_events],filters=tables.Filters(complib='blosc:lz4hc', complevel=1))

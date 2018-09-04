@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[26]:
+# In[1]:
 
 
 import numpy as np
@@ -108,6 +108,21 @@ def hist_2d_proj(hist3d,axis=0):
     print np.shape(proj_hist)
     for i in range(len(hist3d)):
         proj_hist += hist3d[i]
+    
+    return proj_hist
+
+def hist_1d_proj(hist2d,axis=0):
+    if axis==0:
+        axes=[0,1]
+    if axis==1:
+        axes=[1,0]
+        
+    hist2d=np.transpose(hist2d,axes=axes)
+    
+    proj_hist=np.zeros_like(hist2d[0])
+    print np.shape(proj_hist)
+    for i in range(len(hist2d)):
+        proj_hist += hist2d[i]
     
     return proj_hist
 
@@ -266,4 +281,49 @@ plt.legend()
 
 
 llhr['sig'].keys()
+
+
+# In[2]:
+
+
+def load_results_hist(tfile):
+    f=tables.open_file(tfile)
+    labels=f.root.labels[:]
+    nevents=f.root.n_events[:]
+    edges0=f.root.binedges_0[:]
+    edges1=f.root.binedges_1[:]
+    edges2=f.root.binedges_2[:]
+    hist=f.root.hist[:]
+    f.close()
+    return hist, [edges0,edges1,edges2], nevents,labels
+
+
+# In[3]:
+
+
+sig_hist, edges, sig_nevents, labels = load_results_hist('../../files/results_sig_Ezenllhr.hd5')
+bkg_hist, edges, bkg_nevents, labels = load_results_hist('../../files/results_bkg_Ezenllhr.hd5')
+
+
+# In[4]:
+
+
+sig_onedhist=hist_2d_proj(sig_hist,axis=1)[3]
+bkg_onedhist=hist_2d_proj(bkg_hist,axis=1)[3]
+
+
+# In[5]:
+
+
+plt.bar(edges[2][:-1],sig_onedhist,alpha=1.,label='rand')
+plt.bar(edges[2][:-1],bkg_onedhist,alpha=0.3,label='data')
+plt.yscale('log')
+#plt.xlim([-1,1])
+plt.legend()
+
+
+# In[54]:
+
+
+
 
